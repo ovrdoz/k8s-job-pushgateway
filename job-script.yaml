@@ -1,0 +1,39 @@
+# on grafana needed to install these plugins:
+# grafana-cli plugins install yesoreyeram-boomtable-panel
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: job-script
+spec:
+  schedule: "*/1 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: cloud.google.com/gke-nodepool
+                    operator: In
+                    values:
+                    - monitoring-pool
+          containers:
+          - name: job-script
+            image: curlimages/curl
+            imagePullPolicy: IfNotPresent
+            command: ["/bin/sh","/scripts/script.sh"]
+            volumeMounts:
+            - name: script
+              mountPath: "/scripts"
+          volumes:
+          - name: script
+            configMap:
+              name: job-script-configmap
+              defaultMode: 0777
+          restartPolicy: Never
+          terminationGracePeriodSeconds: 0

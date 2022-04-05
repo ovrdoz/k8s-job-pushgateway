@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: job-script-configmap
+data:
+  script.sh: |
+    #!/bin/sh
+    # this list must be incremented to exclusive monitoring of a remote endpoint
+    # these endpoints must always keep the pattern below
+
+    probes="grafana.com:4433,speedtest.net:443,fast.com:443,developers.google.com:443"
+
+    for probe in ${probes//,/ }; do
+      dstination=$(echo $probe | cut -d'.' -f 1)
+      echo "running script for dstination $dstination"
+      connected=$(timeout 0.3s curl -vs telnet://$probe 2>&1 )
+      if [[ "$connected" =~ "Connected" ]] ; then
+          state=1.0
+      else
+          state=0.0
+      fi
+    cat <<EOF | curl --data-binary @- http://prometheus-pushgateway.monitoring:9091/metrics/job/$dstination
+      # TYPE vpn_cron_internal_probe gauge
+      # HELP this as health check with internal vpn way
+      vpn_cron_internal_probe{dstination="$dstination",probe="$probe"} $state
+    EOF
+    done
